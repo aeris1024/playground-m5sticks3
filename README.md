@@ -18,6 +18,7 @@ Python環境は[uv](https://docs.astral.sh/uv/)、組み込み開発環境は[Pl
 | --- | --- |
 | `hello-display` | 画面表示、A/Bボタン入力、シリアル出力を確認する最小サンプル |
 | `imu-monitor` | 内蔵IMUの加速度と角速度を水準器と3軸バーで表示し、CSVとしてシリアル出力 |
+| `voice-memo` | 内蔵マイクで最大約30秒録音し、内蔵スピーカーで再生する。USB Audioは使わない |
 
 利用可能なアプリはCLIでも確認できます。
 
@@ -126,6 +127,33 @@ uv run m5pio monitor imu-monitor --port COM7
 ```text
 millis,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps
 1234,0.0123,-0.0045,0.9981,0.125,-0.250,0.063
+```
+
+## voice-memo
+
+内蔵マイクとスピーカーだけで録音と再生を確認します。USB Audioにはしません。録音はPSRAM上にだけ置き、リセットすると消えます。
+
+- Aボタン：録音開始。録音中なら停止。再生中なら再生を止めて新規録音（上書き）
+- Bボタン：再生。録音中なら停止してすぐ再生。再生中なら頭から再生し直し。データがなければEMPTY
+- 16 kHz、16-bit、モノラル、上限約30秒
+- 30秒に達すると自動停止（FULL）。自動では再生しない
+- マイクとスピーカーは同時に使えないため、録音と再生を切り替えて使う
+- 電池駆動時の再起動を避けるため、再生音量は約70%に固定
+
+```console
+uv run m5pio build voice-memo
+uv run m5pio upload voice-memo --port COM7
+uv run m5pio monitor voice-memo --port COM7
+```
+
+シリアルには状態遷移を出力します。PCMは流しません。
+
+```text
+voice-memo started
+state=EMPTY samples=0
+state=REC samples=0
+state=IDLE samples=48000
+state=PLAY samples=48000
 ```
 
 ## 新しいアプリの追加
