@@ -1,0 +1,25 @@
+[project]
+name = "playground-m5sticks3"
+version = "0.1.0"
+description = "Reproducible PlatformIO playground for M5StickS3"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "pip==26.2.1",
+    "platformio==6.1.19",
+]
+
+[project.scripts]
+m5pio = "m5pio.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.24,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv]
+cache-dir = ".cache/uv"
+python-preference = "system"
+required-version = ">=0.11.24"
+
+[tool.uv.build-backend]
+module-name = "m5pio"
