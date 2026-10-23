@@ -1,0 +1,19 @@
+[project]
+name = "head-tracker-monitor"
+version = "0.1.0"
+description = "M5StickS3 OSC monitor and IEM SceneRotator bridge"
+requires-python = ">=3.14,<3.15"
+dependencies = ["PySide6>=6.10,<7", "python-osc>=1.9,<2", "pyserial==3.5"]
+
+[project.scripts]
+head-tracker-monitor = "head_tracker_monitor.app:main"
+head-tracker-simulate = "head_tracker_monitor.simulate:main"
+
+[build-system]
+requires = ["uv_build>=0.11.24,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv]
+cache-dir = ".cache/uv"
+python-preference = "system"
+required-version = ">=0.11.24"

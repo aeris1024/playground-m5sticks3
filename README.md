@@ -19,6 +19,7 @@ Python環境は[uv](https://docs.astral.sh/uv/)、組み込み開発環境は[Pl
 | `hello-display` | 画面表示、A/Bボタン入力、シリアル出力を確認する最小サンプル |
 | `imu-monitor` | 内蔵IMUの加速度と角速度を水準器と3軸バーで表示し、CSVとしてシリアル出力 |
 | `voice-memo` | 内蔵マイクで最大約30秒録音し、内蔵スピーカーで再生する。USB Audioは使わない |
+| `head-tracker` | 頭の姿勢をWi-FiまたはUSBで送り、Windows確認アプリからIEM SceneRotatorへ中継 |
 
 利用可能なアプリはCLIでも確認できます。
 
@@ -156,6 +157,29 @@ state=IDLE samples=48000
 state=PLAY samples=48000
 ```
 
+## head-tracker
+
+M5StickS3をヘッドフォン上へ「画面を上、USB端子を後ろ」の向きで固定して使います。
+PCアプリで頭の向きを表示し、IEM SceneRotatorへ逆回転のクォータニオンを送ります。
+
+Windowsでは、`tools/head-tracker-monitor/`内の[`start-head-tracker-monitor.cmd`](tools/head-tracker-monitor/start-head-tracker-monitor.cmd)を
+ダブルクリックするとGUIを起動できます。デスクトップにこのファイルのショートカットを置いても使えます。
+初回は依存パッケージを自動で準備します。uvは事前にインストールしてください。
+
+```console
+uv run m5pio build head-tracker
+uv run m5pio upload head-tracker --port COM7
+uv run --project tools/head-tracker-monitor --frozen head-tracker-monitor
+```
+
+PCアプリの「姿勢データの入力」でWi-FiとUSBを切り替えられます。
+USBではポートを選ぶだけで連続受信でき、Wi-Fiの設定は不要です。
+Wi-Fiで使う場合は、初回にUSB経由でWi-Fiと送信先を設定します。設定後は電池で使用できます。
+Aボタンで正面を設定し直し、Bボタンを3秒長押しすると静止校正をやり直します。
+
+PCアプリは独立したPythonプロジェクトとして、専用の依存関係とロックファイルを管理します。
+設定方法、OSC仕様、SceneRotatorとの接続、検証状況は[ヘッドトラッカーの手順](docs/head-tracker.md)を参照してください。
+
 ## 新しいアプリの追加
 
 例として `sensor-viewer` を追加する場合は、次のディレクトリを作成します。
@@ -191,7 +215,9 @@ uv run m5pio upload sensor-viewer --port COM7
 .
 ├── apps/                  サンプルアプリ
 ├── config/sticks3.ini     M5StickS3共通設定
+├── docs/                 通信仕様・アプリ別の操作手順
 ├── src/m5pio/             開発操作をまとめたPython CLI
+├── tools/                PC側の確認アプリ（独立したuvプロジェクト）
 ├── platformio.ini         PlatformIO環境とアプリの登録
 ├── pyproject.toml         PythonプロジェクトとCLI定義
 └── uv.lock                Python依存関係のロックファイル
