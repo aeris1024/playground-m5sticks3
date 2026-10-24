@@ -14,7 +14,7 @@ from .protocol import decode_usb_pose
 def public_response(response: dict) -> dict:
     allowed = ("ok", "error", "ssid", "receiver_ip", "receiver_port", "wifi", "ip", "state",
                "uptime_ms", "sample_count", "quaternion", "accel", "gyro", "front_reference_valid",
-               "front_direction", "usb_stream")
+               "front_direction", "usb_stream", "battery_percent", "battery_charging", "reset_reason")
     return {key: response[key] for key in allowed if key in response}
 
 

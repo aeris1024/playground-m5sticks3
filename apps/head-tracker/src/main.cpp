@@ -33,8 +33,14 @@ struct Snapshot {
   bool front_reference_valid = false;
 };
 
+struct BatteryStatus {
+  int percent = -1;
+  m5::Power_Class::is_charging_t charging = m5::Power_Class::charge_unknown;
+};
+
 Configuration configuration;
 Snapshot snapshot;
+BatteryStatus battery_status;
 SemaphoreHandle_t configuration_mutex;
 portMUX_TYPE snapshot_mutex = portMUX_INITIALIZER_UNLOCKED;
 bool reset_requested = false;
@@ -63,6 +69,24 @@ Snapshot get_snapshot() {
   return copy;
 }
 
+BatteryStatus get_battery_status() {
+  portENTER_CRITICAL(&snapshot_mutex);
+  const auto copy = battery_status;
+  portEXIT_CRITICAL(&snapshot_mutex);
+  return copy;
+}
+
+void update_battery_status() {
+  // Called between IMU acquisitions so the shared I2C bus has one polling task.
+  BatteryStatus next;
+  next.percent = M5.Power.getBatteryLevel();
+  if (next.percent >= 0 && next.percent <= 100) { next.charging = M5.Power.isCharging(); }
+  else { next.percent = -1; }
+  portENTER_CRITICAL(&snapshot_mutex);
+  battery_status = next;
+  portEXIT_CRITICAL(&snapshot_mutex);
+}
+
 void new_session(Snapshot& value) {
   snprintf(value.session, sizeof(value.session), "%08lx%08lx",
            static_cast<unsigned long>(esp_random()), static_cast<unsigned long>(esp_random()));
@@ -78,6 +102,7 @@ void sensor_task(void*) {
   TickType_t wake = xTaskGetTickCount();
   uint32_t last_sample = micros();
   uint32_t last_valid = last_sample;
+  uint32_t last_battery = millis() - 1000;
   uint8_t pending_mask = 0;
   while (true) {
     portENTER_CRITICAL(&snapshot_mutex);
@@ -123,6 +148,11 @@ void sensor_task(void*) {
     current.recenter = snapshot.recenter;
     snapshot = current;
     portEXIT_CRITICAL(&snapshot_mutex);
+    const uint32_t battery_now = millis();
+    if (battery_now - last_battery >= 1000) {
+      last_battery = battery_now;
+      update_battery_status();
+    }
     vTaskDelayUntil(&wake, pdMS_TO_TICKS(10));
   }
 }
@@ -193,7 +223,12 @@ void respond(const String& id, bool ok, const char* error = nullptr) {
   const auto pose = get_snapshot();
   response["state"] = static_cast<int>(pose.state);
   response["usb_stream"] = usb_stream_enabled.load();
+  const auto battery = get_battery_status();
+  response["battery_percent"] = battery.percent;
+  if (battery.charging == m5::Power_Class::charge_unknown) { response["battery_charging"] = nullptr; }
+  else { response["battery_charging"] = battery.charging == m5::Power_Class::is_charging; }
   response["uptime_ms"] = millis();
+  response["reset_reason"] = static_cast<int>(esp_reset_reason());
   response["sample_count"] = pose.sample_count;
   auto quaternion = response["quaternion"].to<JsonArray>();
   auto accel = response["accel"].to<JsonArray>();
@@ -331,6 +366,26 @@ void draw_status() {
   canvas.setTextColor(TFT_CYAN, TFT_BLACK);
   canvas.setCursor(5, 5);
   canvas.print("HEAD TRACKER");
+
+  const auto battery = get_battery_status();
+  const bool charging = battery.charging == m5::Power_Class::is_charging;
+  const uint16_t battery_color = battery.percent < 0 ? TFT_DARKGREY : charging ? TFT_CYAN :
+                                 battery.percent <= 20 ? TFT_RED : TFT_GREEN;
+  const int bx = canvas.width() - 50;
+  canvas.drawRect(bx, 5, 14, 8, battery_color);
+  canvas.fillRect(bx + 14, 7, 2, 4, battery_color);
+  if (battery.percent > 0) {
+    canvas.fillRect(bx + 2, 7, (battery.percent * 10 + 99) / 100, 4, battery_color);
+  }
+  canvas.setTextColor(battery.percent >= 0 && battery.percent <= 20 ? TFT_RED : TFT_WHITE, TFT_BLACK);
+  canvas.setCursor(bx + 19, 5);
+  if (battery.percent >= 0) { canvas.printf("%3d%%", battery.percent); }
+  else { canvas.print(" --%"); }
+  if (charging) {
+    canvas.setTextColor(TFT_CYAN, TFT_BLACK);
+    canvas.setCursor(bx + 25, 18);
+    canvas.print("CHG");
+  }
 
   const int cx = canvas.width() / 2;
   constexpr int cy = 76, radius = 43;
